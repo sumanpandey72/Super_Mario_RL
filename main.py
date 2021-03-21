@@ -1,7 +1,9 @@
 import numpy as np
+# import cPickle as pickle
 import matplotlib.pyplot as plt
 from JSAnimation.IPython_display import display_animation
 from matplotlib import animation
+
 from collections import deque
 from nes_py.wrappers import JoypadSpace
 import gym_super_mario_bros
@@ -23,8 +25,9 @@ def display_frames_as_gif(frames):
     def animate(i):
         patch.set_data(frames[i])
 
-    animation.FuncAnimation(plt.gcf(), animate, frames = len(frames), interval=50)
-    
+    anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(frames), interval=50)
+    plt.show()
+
 observation = env.reset()
 r = []
 infos = []
@@ -46,16 +49,9 @@ r = np.array(r)
 # env.render(close=True)
 display_frames_as_gif(frames)
 
-plt.plot(r)
-plt.title('Rewards')
-plt.show()
-
-plt.plot(xs)
-plt.title('x-pos')
-plt.show()
-
 print('Sum of rewards is ', r.sum())
 
+'''
 def preprocess(frame):
     frame = frame.sum(axis=-1)/765
     frame = frame[20:210,:]
@@ -66,17 +62,14 @@ display_frames_as_gif([preprocess(frame) for frame in frames])
 
 # from dqn_agent import DQNAgent
 # from models import QNetworkCNN
-
+'''
 '''
 """## Models"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 class QNetworkCNN(nn.Module):
     """Actor (Policy) Model."""
-
     def __init__(self, channels, action_size, seed=42):
         """Initialize parameters and build model.
         Params
@@ -98,7 +91,6 @@ class QNetworkCNN(nn.Module):
         flat_len = 16*3*4
         self.fc1 = nn.Linear(flat_len, 20)
         self.fc2 = nn.Linear(20, action_size)
-
     def forward(self, x):
         """Build a network that maps state -> action values."""
         x = self.pool(F.relu(self.conv1(x)))
@@ -106,17 +98,14 @@ class QNetworkCNN(nn.Module):
         x = self.pool(F.relu(self.conv3(x)))
         x = self.pool(F.relu(self.conv4(x)))
         x = self.pool(F.relu(self.conv5(x)))
-
         x = x.reshape(x.shape[0], -1)
         
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
     
         return x
-
 class QNetworkDuellingCNN(nn.Module):
     """Actor (Policy) Model."""
-
     def __init__(self, channels, action_size, seed=42):
         """Initialize parameters and build model.
         Params
@@ -140,7 +129,6 @@ class QNetworkDuellingCNN(nn.Module):
         self.fcval2 = nn.Linear(20, 1)
         self.fcadv = nn.Linear(flat_len, 20)
         self.fcadv2 = nn.Linear(20, action_size)
-
     def forward(self, x):
         """Build a network that maps state -> action values."""
         x = self.pool(F.relu(self.conv1(x)))
@@ -148,7 +136,6 @@ class QNetworkDuellingCNN(nn.Module):
         x = self.pool(F.relu(self.conv3(x)))
         x = self.pool(F.relu(self.conv4(x)))
         x = self.pool(F.relu(self.conv5(x)))
-
         x = x.reshape(x.shape[0], -1)
         
         advantage = F.relu(self.fcadv(x))
@@ -157,23 +144,16 @@ class QNetworkDuellingCNN(nn.Module):
         
         value = F.relu(self.fcval(x))
         value = self.fcval2(value)
-
         return value + advantage
-
 """## Memory buffer
 Saves States, Actions, Rewards, Next States (SARS) and Dones.
-
 If priority sampling is required, we sample according to the error of the model.
 """
-
 import torch
 import numpy as np
-
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
 class ReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
-
     def __init__(self, state_size, action_size, buffer_size, batch_size, priority=False):
         """Initialize a ReplayBuffer object.
         Params
@@ -191,7 +171,6 @@ class ReplayBuffer:
         self.e = np.zeros((buffer_size, 1), dtype=np.float)
         
         self.priority = priority
-
         self.ptr = 0
         self.n = 0
         self.buffer_size = buffer_size
@@ -209,7 +188,6 @@ class ReplayBuffer:
         if self.ptr >= self.buffer_size:
             self.ptr = 0
             self.n = self.buffer_size
-
     def sample(self, get_all=False):
         """Randomly sample a batch of experiences from memory."""
         n = len(self)
@@ -242,39 +220,29 @@ class ReplayBuffer:
             return self.ptr
         else:
             return self.n
-
 """## Agent
 Actual agent and how to respond to the current state of the environment. Uses Models and Memory buffer from before.
-
 y_target = r + gamma * sum(future_rewards)
-
 sum(future_rewards) = q_local(state, action)
 """
-
 import numpy as np
 import random
 from collections import namedtuple, deque
 import itertools
-
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-
 # from ReplayBuffer import ReplayBuffer
-
 BUFFER_SIZE = int(5e3)  # replay buffer size
 BATCH_SIZE = 256         # minibatch size
 GAMMA = 0.99            # discount factor
 TAU = 1e-3              # for soft update of target parameters
 LR = 5e-4               # learning rate 
 UPDATE_EVERY = 10        # how often to update the network
-
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
             
-
 class DQNAgent():
     """Interacts with and learns from the environment."""
-
     def __init__(self, model, state_size, action_size, seed=42, ddqn=False, priority=False):
         """Initialize an Agent object.
         
@@ -288,12 +256,10 @@ class DQNAgent():
         self.action_size = action_size
         self.seed = random.seed(seed)
         self.ddqn = ddqn
-
         # Q-Network
         self.qnetwork_local = model(state_size[0], action_size, seed).to(device)
         self.qnetwork_target = model(state_size[0], action_size, seed).to(device)
         self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=LR)
-
         # Replay memory
         self.memory = ReplayBuffer(state_size, (action_size,), BUFFER_SIZE, BATCH_SIZE)
         # Initialize time step (for updating every UPDATE_EVERY steps)
@@ -311,7 +277,6 @@ class DQNAgent():
                 experiences, idx = self.memory.sample()
                 e = self.learn(experiences)
                 self.memory.update_error(e, idx)
-
     def act(self, state, eps=0.):
         """Returns actions for given state as per current policy.
         
@@ -325,7 +290,6 @@ class DQNAgent():
         with torch.no_grad():
             action_values = self.qnetwork_local(state)
         self.qnetwork_local.train()
-
         # Epsilon-greedy action selection
         if random.random() > eps:
             return np.argmax(action_values.cpu().data.numpy())
@@ -346,7 +310,6 @@ class DQNAgent():
                 old_val = self.qnetwork_local(states).gather(-1, actions)
             e = old_val - target
             self.memory.update_error(e)
-
     def learn(self, experiences):
         """Update value parameters using given batch of experience tuples.
         Params
@@ -355,7 +318,6 @@ class DQNAgent():
             gamma (float): discount factor
         """
         states, actions, rewards, next_states, dones = experiences
-
         ## compute and minimize the loss
         self.optimizer.zero_grad()
         if self.ddqn:
@@ -373,13 +335,10 @@ class DQNAgent():
         loss = F.mse_loss(old_val, target)
         loss.backward()
         self.optimizer.step()
-
         # ------------------- update target network ------------------- #
         self.soft_update(self.qnetwork_local, self.qnetwork_target, TAU) 
         
         return old_val - target
-
-
     def soft_update(self, local_model, target_model, tau):
         """Soft update model parameters.
         θ_target = τ*θ_local + (1 - τ)*θ_target
@@ -391,20 +350,16 @@ class DQNAgent():
         """
         for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
             target_param.data.copy_(tau*local_param.data + (1.0-tau)*target_param.data)
-
 """## Train Agent
 We step through different iterations of the environment to learn the optimal action for a given state.
 """
-
 episode = 100
 discount_rate = .99
 noise = 0.05
 noise_decay = 0.99
 tmax = 500
-
 # keep track of progress
 sum_rewards = []
-
 # keep track of frames
 FRAME_SHAPE = (95, 128)
 MAX_FRAMES = 4
@@ -415,7 +370,6 @@ for i in range(MAX_FRAMES):
 action_size = 7 #len(valid_actions)
 state_size = (MAX_FRAMES,) + FRAME_SHAPE
 agent = DQNAgent(QNetworkDuellingCNN, state_size, action_size, ddqn=True, priority=True)
-
 for e in range(episode):
     obs = env.reset()
     prev_obs = None
@@ -434,7 +388,6 @@ for e in range(episode):
         agent.step(states, int(actions), int(reward), next_states, int(done))
         sum_reward += reward
         states = next_states
-
         if done or reward < -10:
             break
     
@@ -446,14 +399,11 @@ for e in range(episode):
     # display some progress every 20 iterations
     if (e+1) % (episode // 20) ==0:
         print(" | Episode: {0:d}, average score: {1:f}".format(e+1,np.mean(sum_rewards[-20:])))
-
 plt.plot(sum_rewards)
 plt.show()
-
 obs = env.reset()
 prev_obs = None
 sum_reward = 0
-
 frames = np.zeros((tmax, 240, 256, 3), dtype=np.uint8)
 for i in range(MAX_FRAMES):
   nn_frames.append(np.zeros(FRAME_SHAPE))
@@ -468,7 +418,6 @@ for t in range(tmax):
     obs, reward, done, info = env.step(actions)
     nn_frames.append(np.copy(preprocess(obs)))
     next_states = np.array(nn_frames)
-
     sum_reward += reward
     states = next_states
     rs.append(reward)
@@ -476,14 +425,10 @@ for t in range(tmax):
     ys.append(info['y_pos'])
     if done:
         break
-
 print('Sum of rewards is ', sum(rs))
 plt.plot(rs)
 plt.show()
-
 plt.plot(xs)
 plt.show()
-
 display_frames_as_gif(frames)
-
 '''
