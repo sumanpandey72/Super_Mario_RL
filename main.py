@@ -1,3 +1,7 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
 import numpy as np
 # import cPickle as pickle
 import matplotlib.pyplot as plt
@@ -7,67 +11,11 @@ from matplotlib import animation
 from collections import deque
 from nes_py.wrappers import JoypadSpace
 import gym_super_mario_bros
-from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
+from gym_super_mario_bros.actions import COMPLEX_MOVEMENT
 env = gym_super_mario_bros.make('SuperMarioBros-v0')
-env = JoypadSpace(env, SIMPLE_MOVEMENT)
-
-action_space = env.get_action_meanings()
-action_space
-
-def display_frames_as_gif(frames):
-    """
-    Displays a list of frames as a gif, with controls
-    """
-    #plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi = 72)
-    patch = plt.imshow(frames[0])
-    plt.axis('off')
-
-    def animate(i):
-        patch.set_data(frames[i])
-
-    anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(frames), interval=50)
-    plt.show()
-
-observation = env.reset()
-r = []
-infos = []
-MAX_STEPS = 500
-frames = np.zeros((MAX_STEPS, 240, 256, 3), dtype=np.uint8)
-xs = []
-valid_actions = [1,5,6]
-for step in range(MAX_STEPS):
-    # Render into buffer. 
-    frames[step] = env.render(mode = 'rgb_array')
-    observation, reward, done, info = env.step(valid_actions[np.random.randint(3)]) #
-    infos.append(info)
-    r.append(reward)
-    xs.append(info['x_pos'])
-    if done:
-        break
-        
-r = np.array(r)
-# env.render(close=True)
-display_frames_as_gif(frames)
-
-print('Sum of rewards is ', r.sum())
+env = JoypadSpace(env, COMPLEX_MOVEMENT)
 
 '''
-def preprocess(frame):
-    frame = frame.sum(axis=-1)/765
-    frame = frame[20:210,:]
-    frame = frame[::2,::2]
-    return frame
-
-display_frames_as_gif([preprocess(frame) for frame in frames])
-
-# from dqn_agent import DQNAgent
-# from models import QNetworkCNN
-'''
-'''
-"""## Models"""
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 class QNetworkCNN(nn.Module):
     """Actor (Policy) Model."""
     def __init__(self, channels, action_size, seed=42):
@@ -104,6 +52,7 @@ class QNetworkCNN(nn.Module):
         x = self.fc2(x)
     
         return x
+'''
 class QNetworkDuellingCNN(nn.Module):
     """Actor (Policy) Model."""
     def __init__(self, channels, action_size, seed=42):
@@ -145,6 +94,7 @@ class QNetworkDuellingCNN(nn.Module):
         value = F.relu(self.fcval(x))
         value = self.fcval2(value)
         return value + advantage
+
 """## Memory buffer
 Saves States, Actions, Rewards, Next States (SARS) and Dones.
 If priority sampling is required, we sample according to the error of the model.
@@ -431,4 +381,3 @@ plt.show()
 plt.plot(xs)
 plt.show()
 display_frames_as_gif(frames)
-'''
